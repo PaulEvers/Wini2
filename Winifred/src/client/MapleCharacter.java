@@ -6561,7 +6561,7 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
                     }
 
                     final String names = (getMedalText() + name);
-                    getWorldServer().broadcastPacket(MaplePacketCreator.serverNotice(6, String.format(LEVEL_250, names, maxClassLevel, names)));
+                    getWorldServer().broadcastPacket(MaplePacketCreator.serverNotice(6, String.format(LEVEL_200, names, maxClassLevel, names)));
                 }
             }
 
@@ -10547,7 +10547,7 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
             nEquip.gainItemExp(client, expGain);
         }
     }
-    }
+    
     
     public void showAllEquipFeatures() {
         String showMsg = "";

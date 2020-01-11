@@ -18,14 +18,13 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
+*/
 package server.maps;
 
 import java.util.concurrent.ScheduledFuture;
 import server.TimerManager;
 
 public class MapMonitor {
-
     private ScheduledFuture<?> monitorSchedule;
     private MapleMap map;
     private MaplePortal portal;
@@ -48,20 +47,18 @@ public class MapMonitor {
             monitorSchedule.cancel(false);
             monitorSchedule = null;
         }
-
+        
         if (map != null) {
             map.killAllMonsters();
             map.clearDrops();
         }
-
         if (portal != null) {
             portal.setPortalStatus(MaplePortal.OPEN);
         }
-
         if (map != null) {
             map.resetReactors();
         }
-
+        
         map = null;
         portal = null;
     }

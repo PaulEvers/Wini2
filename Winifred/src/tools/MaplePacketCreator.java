@@ -341,7 +341,7 @@ public class MaplePacketCreator {
                 if (!viewall) {
                         mplew.write(0);
                 }
-                if (chr.isGM() || chr.isGmJob()) {  // thanks Egg Daddy (Ubaware), resinate for noticing GM jobs crashing on non-GM players account
+                if (chr.isGM() || chr.isGmJob()) {  // thanks Daddy Egg (Ubaware), resinate for noticing GM jobs crashing on non-GM players account
                         mplew.write(0);
                         return;
                 }
@@ -425,7 +425,7 @@ public class MaplePacketCreator {
                         mplew.writeShort(pet.getCloseness());
                         mplew.write(pet.getFullness());
                         addExpirationTime(mplew, item.getExpiration());
-                        mplew.writeInt(pet.getPetFlag());  /* pet flags found by -- lrenex & Spoon */
+                        mplew.writeInt(pet.getPetFlag());  /* pet flags noticed by lrenex & Spoon */
                         
                         mplew.write(new byte[]{(byte) 0x50, (byte) 0x46}); //wonder what this is
                         mplew.writeInt(0);
@@ -588,8 +588,8 @@ public class MaplePacketCreator {
          * Sends a hello packet.
          *
          * @param mapleVersion The maple client version.
-         * @param sendIv the IV used by the server for sending
-         * @param recvIv the IV used by the server for receiving
+         * @param sendIv the IV in use by the server for sending
+         * @param recvIv the IV in use by the server for receiving
          * @return
          */
         public static byte[] getHello(short mapleVersion, byte[] sendIv, byte[] recvIv) {
@@ -1486,6 +1486,43 @@ public class MaplePacketCreator {
                 mplew.write(newSpawn ? -2 : -1);
         }
         
+        private static void encodeTemporary(MaplePacketLittleEndianWriter mplew, Map<MonsterStatus, MonsterStatusEffect> stati) {
+                int pCounter = -1, mCounter = -1;
+            
+                writeLongEncodeTemporaryMask(mplew, stati.keySet());    // packet structure mapped thanks to Eric
+                
+                for (Entry<MonsterStatus, MonsterStatusEffect> s : stati.entrySet()) {
+                        MonsterStatusEffect mse = s.getValue();
+                        mplew.writeShort(mse.getStati().get(s.getKey()));
+                        
+                        MobSkill mobSkill = mse.getMobSkill();
+                        if (mobSkill != null) {
+                                mplew.writeShort(mobSkill.getSkillId());
+                                mplew.writeShort(mobSkill.getSkillLevel());
+
+                                switch(s.getKey()) {
+                                    case WEAPON_REFLECT:
+                                            pCounter = mobSkill.getX();
+                                            break;
+                                            
+                                    case MAGIC_REFLECT:
+                                            mCounter = mobSkill.getY();
+                                            break;
+                                }
+                        } else {
+                            Skill skill = mse.getSkill();
+                            mplew.writeInt(skill != null ? skill.getId() : 0);
+                        }
+                        
+                        mplew.writeShort(-1);    // duration
+                }
+                
+                // reflect packet structure found thanks to Arnah (Vertisy)
+		if(pCounter != -1) mplew.writeInt(pCounter);// wPCounter_
+		if(mCounter != -1) mplew.writeInt(mCounter);// wMCounter_
+		if(pCounter != -1 || mCounter != -1) mplew.writeInt(100);// nCounterProb_
+        }
+        
         /**
          * Internal function to handler monster spawning and controlling.
          *
@@ -1513,9 +1550,13 @@ public class MaplePacketCreator {
                 mplew.writeInt(life.getObjectId());
                 mplew.write(life.getController() == null ? 5 : 1);
                 mplew.writeInt(life.getId());
-                mplew.skip(15);
-                mplew.write(0x88);
-                mplew.skip(6);
+                
+                if (requestController) {
+                    encodeTemporary(mplew, life.getStati());    // thanks shot for noticing encode temporary buffs missing
+                } else {
+                    mplew.skip(16);
+                }
+                
                 mplew.writePos(life.getPosition());
                 mplew.write(life.getStance());
                 mplew.writeShort(0); //Origin FH //life.getStartFh()
@@ -1561,9 +1602,7 @@ public class MaplePacketCreator {
                 mplew.writeInt(life.getObjectId());
                 mplew.write(5);
                 mplew.writeInt(life.getId());
-                mplew.skip(15);
-                mplew.write(0x88);
-                mplew.skip(6);
+                encodeTemporary(mplew, life.getStati());
                 mplew.writePos(life.getPosition());
                 mplew.write(life.getStance());
                 mplew.writeShort(0);//life.getStartFh()
@@ -1591,9 +1630,7 @@ public class MaplePacketCreator {
                 mplew.writeInt(life.getObjectId());
                 mplew.write(5);
                 mplew.writeInt(life.getId());
-                mplew.skip(15);
-                mplew.write(0x88);
-                mplew.skip(6);
+                encodeTemporary(mplew, life.getStati());
                 mplew.writePos(life.getPosition());
                 mplew.write(life.getStance());
                 mplew.writeShort(0);//life.getStartFh()
@@ -1890,7 +1927,7 @@ public class MaplePacketCreator {
                 }
                 long buffmask = 0;
                 Integer buffvalue = null;
-                if (chr.getBuffedValue(MapleBuffStat.DARKSIGHT) != null && !chr.isHidden()) {
+                if ((chr.getBuffedValue(MapleBuffStat.DARKSIGHT) != null || chr.getBuffedValue(MapleBuffStat.WIND_WALK) != null) && !chr.isHidden()) {
                         buffmask |= MapleBuffStat.DARKSIGHT.getValue();
                 }
                 if (chr.getBuffedValue(MapleBuffStat.COMBO) != null) {
@@ -1906,10 +1943,6 @@ public class MaplePacketCreator {
                 if (chr.getBuffedValue(MapleBuffStat.MORPH) != null) {
                         buffvalue = Integer.valueOf(chr.getBuffedValue(MapleBuffStat.MORPH).intValue());
                 }
-                if (chr.getBuffedValue(MapleBuffStat.ENERGY_CHARGE) != null) {
-                        buffmask |= MapleBuffStat.ENERGY_CHARGE.getValue();
-                        buffvalue = Integer.valueOf(chr.getBuffedValue(MapleBuffStat.ENERGY_CHARGE).intValue());
-                }//AREN'T THESE 
                 mplew.writeInt((int) ((buffmask >> 32) & 0xffffffffL));
                 if (buffvalue != null) {
                         if (chr.getBuffedValue(MapleBuffStat.MORPH) != null) { //TEST
@@ -1919,16 +1952,24 @@ public class MaplePacketCreator {
                         }
                 }
                 mplew.writeInt((int) (buffmask & 0xffffffffL));
-                int CHAR_MAGIC_SPAWN = Randomizer.nextInt();
-                mplew.skip(6);
-                mplew.writeInt(CHAR_MAGIC_SPAWN);
+                
+                // Energy Charge
+                mplew.writeInt(chr.getEnergyBar() == 15000 ? 1 : 0);
+                mplew.writeShort(0);
+                mplew.skip(4);
+                
+                boolean dashBuff = chr.getBuffedValue(MapleBuffStat.DASH) != null;
+                // Dash Speed
+                mplew.writeInt(dashBuff ? 1 << 24 : 0);
                 mplew.skip(11);
-                mplew.writeInt(CHAR_MAGIC_SPAWN);//v74
-                mplew.skip(11);
-                mplew.writeInt(CHAR_MAGIC_SPAWN);
+                mplew.writeShort(0);
+                // Dash Jump
+                mplew.skip(9);
+                mplew.writeInt(dashBuff ? 1 << 24 : 0);
                 mplew.writeShort(0);
                 mplew.write(0);
                 
+                // Monster Riding
                 Integer bv = chr.getBuffedValue(MapleBuffStat.MONSTER_RIDING);
                 if (bv != null) {
                         MapleMount mount = chr.getMount();
@@ -1942,17 +1983,23 @@ public class MaplePacketCreator {
                         mplew.writeLong(0);
                 }
                 
+                int CHAR_MAGIC_SPAWN = Randomizer.nextInt();    // skill references found thanks to Rien dev team
                 mplew.writeInt(CHAR_MAGIC_SPAWN);
+                // Speed Infusion
+                mplew.skip(8);
+                mplew.writeInt(CHAR_MAGIC_SPAWN);
+                mplew.write(0);
+                mplew.writeInt(CHAR_MAGIC_SPAWN);
+                mplew.writeShort(0);
+                // Homing Beacon
+                mplew.skip(9);
+                mplew.writeInt(CHAR_MAGIC_SPAWN);
+                mplew.writeInt(0);
+                // Zombify
                 mplew.skip(9);
                 mplew.writeInt(CHAR_MAGIC_SPAWN);
                 mplew.writeShort(0);
-                mplew.writeInt(0); // actually not 0, why is it 0 then?
-                mplew.skip(10);
-                mplew.writeInt(CHAR_MAGIC_SPAWN);
-                mplew.skip(13);
-                mplew.writeInt(CHAR_MAGIC_SPAWN);
                 mplew.writeShort(0);
-                mplew.write(0);
         }
         
         /**
@@ -2226,7 +2273,7 @@ public class MaplePacketCreator {
                 mplew.write(game.getGameType().getValue());
                 mplew.writeInt(game.getObjectId()); // gameid/shopid
                 mplew.writeMapleAsciiString(game.getDescription()); // desc
-                mplew.writeBool(!game.getPassword().isEmpty());    // password here, thanks GabrielSin!
+                mplew.writeBool(!game.getPassword().isEmpty());    // password here, thanks GabrielSin
                 mplew.write(game.getPieceType());
                 mplew.write(ammount);
                 mplew.write(2);         //player capacity
@@ -2240,7 +2287,7 @@ public class MaplePacketCreator {
                 mplew.writeInt(hm.getObjectId());
                 mplew.writeMapleAsciiString(hm.getDescription());
                 mplew.write(hm.getItemId() % 100);
-                mplew.write(roomInfo);    // visitor capacity here, thanks GabrielSin!
+                mplew.write(roomInfo);    // visitor capacity here, thanks GabrielSin
         }
         
         public static byte[] updateHiredMerchantBox(MapleHiredMerchant hm) {
@@ -2292,7 +2339,7 @@ public class MaplePacketCreator {
 
         private static void rebroadcastMovementList(LittleEndianWriter lew, SeekableLittleEndianAccessor slea, long movementDataLength) {
         	//movement command length is sent by client, probably not a big issue? (could be calculated on server)
-        	//if multiple write/reads are slow, could use a (cached?) byte[] buffer
+        	//if multiple write/reads are slow, could use (and cache?) a byte[] buffer
         	for(long i = 0; i < movementDataLength; i++) {
         		lew.write(slea.readByte());
         	}
@@ -3067,6 +3114,15 @@ public class MaplePacketCreator {
                 return mplew.getPacket();
         }
 
+        public static byte[] cancelForeignFirstDebuff(int cid, long mask) {
+                final MaplePacketLittleEndianWriter mplew = new MaplePacketLittleEndianWriter();
+                mplew.writeShort(SendOpcode.CANCEL_FOREIGN_BUFF.getValue());
+                mplew.writeInt(cid);
+                mplew.writeLong(mask);
+                mplew.writeLong(0);
+                return mplew.getPacket();
+        }
+        
         public static byte[] cancelForeignDebuff(int cid, long mask) {
                 final MaplePacketLittleEndianWriter mplew = new MaplePacketLittleEndianWriter();
                 mplew.writeShort(SendOpcode.CANCEL_FOREIGN_BUFF.getValue());
@@ -3132,6 +3188,21 @@ public class MaplePacketCreator {
                 mplew.writeLong(firstmask);
                 mplew.writeLong(secondmask);
         }
+        
+        private static void writeLongEncodeTemporaryMask(final MaplePacketLittleEndianWriter mplew, Collection<MonsterStatus> stati) {
+                int masks[] = new int[4];
+                
+                for (MonsterStatus statup : stati) {
+                        int pos = statup.isFirst() ? 0 : 2;
+                        for (int i = 0; i < 2; i++) {
+                                masks[pos + i] |= statup.getValue() >> 32 * i;
+                        }
+                }
+                
+                for (int i = 0; i < masks.length; i++) {
+                        mplew.writeInt(masks[i]);
+                }
+        }
 
         public static byte[] cancelDebuff(long mask) {
                 final MaplePacketLittleEndianWriter mplew = new MaplePacketLittleEndianWriter(19);
@@ -3194,6 +3265,20 @@ public class MaplePacketCreator {
                 mplew.writeShort(900);
                 
                 mplew.skip(7);
+                
+                return mplew.getPacket();
+        }
+        
+        // packet found thanks to Ronan
+        public static byte[] giveForeignWKChargeEffect(int cid, int buffid, List<Pair<MapleBuffStat, Integer>> statups) {
+                final MaplePacketLittleEndianWriter mplew = new MaplePacketLittleEndianWriter(19);
+                mplew.writeShort(SendOpcode.GIVE_FOREIGN_BUFF.getValue());
+                mplew.writeInt(cid);
+                writeLongMask(mplew, statups);
+                mplew.writeInt(buffid);
+                mplew.writeShort(600);
+                mplew.writeShort(1000);//Delay
+                mplew.write(1);
                 
                 return mplew.getPacket();
         }
@@ -3382,7 +3467,7 @@ public class MaplePacketCreator {
         }
 
         /**
-         * Possible values for <code>operation</code>:<br> 2: Trade cancelled by the
+         * Possible values for <code>operation</code>:<br> 2: Trade cancelled, by the
          * other character<br> 7: Trade successful<br> 8: Trade unsuccessful<br> 
          * 9: Cannot carry more one-of-a-kind items<br> 12: Cannot trade on different maps<br>
          * 13: Cannot trade, game files damaged<br> 
@@ -3479,7 +3564,7 @@ public class MaplePacketCreator {
                 return mplew.getPacket();
         }
         
-        // thanks NPC Quiz packets thanks to Eric
+        // NPC Quiz packets thanks to Eric
         public static byte[] OnAskQuiz(int nSpeakerTypeID, int nSpeakerTemplateID, int nResCode, String sTitle, String sProblemText, String sHintText, int nMinInput, int nMaxInput, int tRemainInitialQuiz) { 
                 MaplePacketLittleEndianWriter mplew = new MaplePacketLittleEndianWriter(); 
                 mplew.writeShort(SendOpcode.NPC_TALK.getValue()); 
@@ -4102,30 +4187,6 @@ public class MaplePacketCreator {
                 }
                 mplew.writeInt(firstmask);
                 mplew.writeInt(secondmask);
-        }
-        
-        public static byte[] applyMonsterStatus(int oid, Map<MonsterStatus, Integer> stats, int skill, boolean monsterSkill, int delay, MobSkill mobskill) {
-                MaplePacketLittleEndianWriter mplew = new MaplePacketLittleEndianWriter();
-                mplew.writeShort(SendOpcode.APPLY_MONSTER_STATUS.getValue());
-                mplew.writeInt(oid);
-                int mask = 0;
-                for (MonsterStatus stat : stats.keySet()) {
-                        mask |= stat.getValue();
-                }
-                mplew.writeInt(mask);
-                for (Integer val : stats.values()) {
-                        mplew.writeShort(val);
-                        if (monsterSkill) {
-                                mplew.writeShort(mobskill.getSkillId());
-                                mplew.writeShort(mobskill.getSkillLevel());
-                        } else {
-                                mplew.writeInt(skill);
-                        }
-                        mplew.writeShort(0); // as this looks similar to giveBuff this
-                }
-                mplew.writeShort(delay); // delay in ms
-                mplew.write(1); // ?
-                return mplew.getPacket();
         }
         
         public static byte[] applyMonsterStatus(final int oid, final MonsterStatusEffect mse, final List<Integer> reflection) {
@@ -7472,7 +7533,7 @@ public class MaplePacketCreator {
          * now.<br> 2: You cannot go to that place.<br> 3: Unable to approach due to
          * the force of the ground.<br> 4: You cannot teleport to or on this
          * map.<br> 5: Unable to approach due to the force of the ground.<br> 6:
-         * This map can only be entered by party members.<br> 7: The Cash Shop is
+         * Only party members can enter this map.<br> 7: The Cash Shop is
          * currently not available. Stay tuned...<br>
          *
          * @param type The type
@@ -7960,7 +8021,7 @@ public class MaplePacketCreator {
          * E0 = event or free test time ended
          * E6 = item cannot be purchased with MaplePoints
          * E7 = lol sorry for the inconvenience, eh?
-         * E8 = cannot be purchased by anyone under 7
+         * E8 = cannot purchase by anyone under 7
          */
         public static byte[] showCashShopMessage(byte message) {
                 final MaplePacketLittleEndianWriter mplew = new MaplePacketLittleEndianWriter(4);

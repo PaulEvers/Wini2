@@ -244,7 +244,7 @@ public final class UseCashItemHandler extends AbstractMaplePacketHandler {
                     eq.setExpiration(currentServerTime() + (period * 60 * 60 * 24 * 1000));
                 }
 
-                remove(c, position, itemId);
+                // double-remove found thanks to BHB
             } else if (itemId == 5060002) { // Incubator
                 byte inventory2 = (byte) slea.readInt();
                 short slot2 = (short) slea.readInt();
@@ -348,7 +348,7 @@ public final class UseCashItemHandler extends AbstractMaplePacketHandler {
                     break;
             }
             remove(c, position, itemId);
-        } else if (itemType == 508) {   // graduation banner, thanks to tmskdl12. Also, thanks ratency for first pointing lack of Kite handling
+        } else if (itemType == 508) {   // thanks tmskdl12 for graduation banner; thanks ratency for first pointing lack of Kite handling
             MapleKite kite = new MapleKite(player, slea.readMapleAsciiString(), itemId);
             
             if (!GameConstants.isFreeMarketRoom(player.getMapId())) {

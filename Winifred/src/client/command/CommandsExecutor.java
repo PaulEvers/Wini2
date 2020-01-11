@@ -1,6 +1,6 @@
 /*
     This file is part of the HeavenMS MapleStory Server, commands OdinMS-based
-    Copyleft (L) 2016 - 2018 RonanLana
+    Copyleft (L) 2016 - 2019 RonanLana
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU Affero General Public License as
@@ -23,7 +23,6 @@
 */
 package client.command;
 
-import client.command.commands.gm0.WhoDropsCommand;
 import client.command.commands.gm0.*;
 import client.command.commands.gm1.*;
 import client.command.commands.gm2.*;
@@ -223,7 +222,7 @@ public class CommandsExecutor {
     private void registerLv1Commands() {
         levelCommandsCursor = new Pair<>((List<String>) new ArrayList<String>(), (List<String>) new ArrayList<String>());
         
-        // addCommand("whatdropsfrom", 1, WhatDropsFromCommand.class);
+        addCommand("whatdropsfrom", 1, WhatDropsFromCommand.class);
         
         addCommand("buffme", 1, BuffMeCommand.class);
         addCommand("goto", 1, GotoCommand.class);

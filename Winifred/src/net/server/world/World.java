@@ -110,7 +110,7 @@ import tools.packets.Fishing;
 /**
  *
  * @author kevintjuh93
- * @author Ronan - thread-oriented world schedules, guild queue, marriages & party chars
+ * @author Ronan - thread-oriented (world schedules + guild queue + marriages + party chars)
  */
 public class World {
 
@@ -467,7 +467,13 @@ public class World {
         }
     }
     
-    public void registerAccountStorage(Integer accountId) {
+    public void loadAccountStorage(Integer accountId) {
+        if (getAccountStorage(accountId) == null) {
+            registerAccountStorage(accountId);
+        }
+    }
+    
+    private void registerAccountStorage(Integer accountId) {
         MapleStorage storage = MapleStorage.loadOrCreateFromDB(accountId, this.id);
         accountCharsLock.lock();
         try {
@@ -511,7 +517,7 @@ public class World {
         return getAllCharactersView();
     }
     
-    public List<MapleCharacter> getAllCharactersView() {    // sorted by accountid, charid
+    public List<MapleCharacter> getAllCharactersView() {    // sorting by accountid, charid
         List<MapleCharacter> chrList = new LinkedList<>();
         Map<Integer, SortedMap<Integer, MapleCharacter>> accChars;
         
@@ -572,7 +578,7 @@ public class World {
         
         if(cserv != null) {
             if(!cserv.removePlayer(chr)) {
-                // oy the player is not where it should be, find this mf
+                // oy the player is not where they should be, find this mf
 
                 for(Channel ch : getChannels()) {
                     if(ch.removePlayer(chr)) {

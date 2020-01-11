@@ -76,7 +76,6 @@ public final class SpecialMoveHandler extends AbstractMaplePacketHandler {
         if (skillLevel == 0 || skillLevel != __skillLevel) return;
         
         MapleStatEffect effect = skill.getEffect(skillLevel);
-
         if (effect.getCooldown() > 0) {
             if (chr.skillIsCooling(skillid)) {
                 return;

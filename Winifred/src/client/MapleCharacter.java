@@ -144,7 +144,6 @@ import client.processor.action.PetAutopotProcessor;
 import constants.game.ExpTable;
 import constants.game.GameConstants;
 import constants.inventory.ItemConstants;
-import constants.net.ServerConstants;
 import constants.skills.Aran;
 import constants.skills.Beginner;
 import constants.skills.Bishop;
@@ -183,7 +182,7 @@ import tools.LongTool;
 
 public class MapleCharacter extends AbstractMapleCharacterObject {
     private static final MapleItemInformationProvider ii = MapleItemInformationProvider.getInstance();
-    private static final String LEVEL_250 = "[Congrats] %s has reached Level %d! Congratulate %s on such an amazing achievement!";
+    private static final String LEVEL_200 = "[Congrats] %s has reached Level %d! Congratulate %s on such an amazing achievement!";
     private static final String[] BLOCKED_NAMES = {"admin", "owner", "moderator", "intern", "donor", "administrator", "FREDRICK", "help", "helper", "alert", "notice", "maplestory", "fuck", "wizet", "fucking", "negro", "fuk", "fuc", "penis", "pussy", "asshole", "gay",
         "nigger", "homo", "suck", "cum", "shit", "shitty", "condom", "security", "official", "rape", "nigga", "sex", "tit", "boner", "orgy", "clit", "asshole", "fatass", "bitch", "support", "gamemaster", "cock", "gaay", "gm",
         "operate", "master", "sysop", "party", "GameMaster", "community", "message", "event", "test", "meso", "Scania", "yata", "AsiaSoft", "henesys"};
@@ -1472,11 +1471,14 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
         changeMap(to, to.getPortal(portal));
     }
     
-    public void changeMap(final MapleMap target, final MaplePortal pto) {
+    public void changeMap(final MapleMap target, MaplePortal pto) {
         canWarpCounter++;
         
         eventChangedMap(target.getId());    // player can be dropped from an event here, hence the new warping target.
         MapleMap to = getWarpMap(target.getId());
+        if (pto == null) {
+            pto = to.getPortal(0);
+        }
         changeMapInternal(to, pto.getPosition(), MaplePacketCreator.getWarpToMap(to, pto.getId(), this));
         canWarpMap = false;
         
@@ -1504,7 +1506,7 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
         eventAfterChangedMap(this.getMapId());
     }
     
-    public void forceChangeMap(final MapleMap target, final MaplePortal pto) {
+    public void forceChangeMap(final MapleMap target, MaplePortal pto) {
         // will actually enter the map given as parameter, regardless of being an eventmap or whatnot
         
         canWarpCounter++;
@@ -1525,6 +1527,9 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
         }
         
         MapleMap to = target; // warps directly to the target intead of the target's map id, this allows GMs to patrol players inside instances.
+        if (pto == null) {
+            pto = to.getPortal(0);
+        }
         changeMapInternal(to, pto.getPosition(), MaplePacketCreator.getWarpToMap(to, pto.getId(), this));
         canWarpMap = false;
         
@@ -2256,7 +2261,7 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
     
     public static boolean deleteCharFromDB(MapleCharacter player, int senderAccId) {
             int cid = player.getId();
-            if(!Server.getInstance().haveCharacterEntry(senderAccId, cid)) {    // thanks zera (EpiphanyMS) for pointing a critical exploit with non-authored character deletion request
+            if(!Server.getInstance().haveCharacterEntry(senderAccId, cid)) {    // thanks zera (EpiphanyMS) for pointing a critical exploit with non-authed character deletion request
                     return false;
             }
             
@@ -2813,7 +2818,14 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
         dispelDebuff(MapleDisease.WEAKEN);
         dispelDebuff(MapleDisease.SLOW);    // thanks Conrad for noticing ZOMBIFY isn't dispellable
     }
-
+    
+    public void purgeDebuffs() {
+        dispelDebuff(MapleDisease.SEDUCE);
+        dispelDebuff(MapleDisease.ZOMBIFY);
+        dispelDebuff(MapleDisease.CONFUSE);
+        dispelDebuffs();
+    }
+    
     public void cancelAllDebuffs() {
         chrLock.lock();
         try {
@@ -3276,7 +3288,7 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
         }
     }
     
-    public boolean canHoldMeso(int gain) {  // thanks lucasziron found pointing out a need to check space availability for mesos on player transactions
+    public boolean canHoldMeso(int gain) {  // thanks lucasziron for pointing out a need to check space availability for mesos on player transactions
         long nextMeso = (long) meso.get() + gain;
         return nextMeso <= Integer.MAX_VALUE;
     }
@@ -3575,7 +3587,7 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
                 p = new Pair<>(mbs, 0);
             }
             
-            if (!isSingletonStatup(mbs)) {   // thanks resinate, Egg Daddy for pointing out morph issues when updating it along with other statups
+            if (!isSingletonStatup(mbs)) {   // thanks resinate, Daddy Egg for pointing out morph issues when updating it along with other statups
                 ret.add(p);
             } else {
                 singletonStatups.add(p);
@@ -6102,7 +6114,7 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
                     List<Pair<MapleBuffStat, Integer>> stat = Collections.singletonList(new Pair<>(MapleBuffStat.ENERGY_CHARGE, energybar));
                     setBuffedValue(MapleBuffStat.ENERGY_CHARGE, energybar);
                     client.announce(MaplePacketCreator.giveBuff(energybar, 0, stat));
-                    getMap().broadcastMessage(chr, MaplePacketCreator.giveForeignBuff(energybar, stat));
+                    getMap().broadcastMessage(chr, MaplePacketCreator.cancelForeignFirstDebuff(id, ((long) 1) << 50));
                 }
             }, ceffect.getDuration());
         }
@@ -7415,7 +7427,7 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
                 rs = ps.executeQuery();
                 while (rs.next()) {
                     Skill pSkill = SkillFactory.getSkill(rs.getInt("skillid"));
-                    if(pSkill != null)  // edit reported by shavit, thanks Zein for noticing an NPE here
+                    if(pSkill != null)  // edit reported by Shavit (=＾● ⋏ ●＾=), thanks Zein for noticing an NPE here
                     {
                         ret.skills.put(pSkill, new SkillEntry(rs.getByte("skilllevel"), rs.getInt("masterlevel"), rs.getLong("expiration")));
                     }
@@ -8013,7 +8025,7 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
                 client.announce(MaplePacketCreator.updatePlayerStats(hpmpupdate, true, this));
             }
 
-            if (oldmaxhp != localmaxhp) {   // thanks Wh1SK3Y for pointing out a deadlock occuring related to party members HP
+            if (oldmaxhp != localmaxhp) {   // thanks Wh1SK3Y (Suwaidy) for pointing out a deadlock occuring related to party members HP
                 updatePartyMemberHP();
             }
         } finally {
@@ -9420,25 +9432,42 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
     public byte getSlots(int type) {
         return type == MapleInventoryType.CASH.getType() ? 96 : inventory[type].getSlotLimit();
     }
-
+    
+    public boolean canGainSlots(int type, int slots) {
+        slots += inventory[type].getSlotLimit();
+        return slots <= 96;
+    }
+    
     public boolean gainSlots(int type, int slots) {
         return gainSlots(type, slots, true);
     }
 
     public boolean gainSlots(int type, int slots, boolean update) {
-        slots += inventory[type].getSlotLimit();
-        if (slots <= 96) {
-            inventory[type].setSlotLimit(slots);
-
+        int newLimit = gainSlotsInternal(type, slots);
+        if (newLimit != -1) {
             this.saveCharToDB();
             if (update) {
-                client.announce(MaplePacketCreator.updateInventorySlotLimit(type, slots));
+                client.announce(MaplePacketCreator.updateInventorySlotLimit(type, newLimit));
             }
-
             return true;
+        } else {
+            return false;
         }
-
-        return false;
+    }
+    
+    private int gainSlotsInternal(int type, int slots) {
+        inventory[type].lockInventory();
+        try {
+            if (canGainSlots(type, slots)) {
+                int newLimit = inventory[type].getSlotLimit() + slots;
+                inventory[type].setSlotLimit(newLimit);
+                return newLimit;
+            } else {
+                return -1;
+            }
+        } finally {
+            inventory[type].unlockInventory();
+        }
     }
     
     public int sellAllItemsFromName(byte invTypeId, String name) {
@@ -10039,7 +10068,7 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
             if (!mquest.isSameDayRepeatable() && !MapleQuest.isExploitableQuest(questid)) {
                 awardQuestPoint(YamlConfig.config.server.QUEST_POINT_PER_QUEST_COMPLETE);
             }
-            qs.setCompleted(qs.getCompleted() + 1);   // count quest completed Jayd's idea
+            qs.setCompleted(qs.getCompleted() + 1);   // Jayd's idea - count quest completed
 
             announceUpdateQuest(DelayedQuestUpdate.COMPLETE, questid, qs.getCompletionTime());
             //announceUpdateQuest(DelayedQuestUpdate.INFO, qs); // happens after giving rewards, for non-next quests only
@@ -10518,6 +10547,7 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
             nEquip.gainItemExp(client, expGain);
         }
     }
+    }
     
     public void showAllEquipFeatures() {
         String showMsg = "";
@@ -10645,6 +10675,12 @@ public class MapleCharacter extends AbstractMapleCharacterObject {
                     client = null;  // clients still triggers handlers a few times after disconnecting
                     map = null;
                     setListener(null);
+                    
+                    // thanks Shavit for noticing a memory leak with inventories holding owner object
+                    for (int i = 0; i < inventory.length; i++) {
+                        inventory[i].dispose();
+                    }
+                    inventory = null;
                 }
             }, 5 * 60 * 1000);
         }
